@@ -1,0 +1,47 @@
+# free-stack 每日健康检查
+# 仓库：xiaobai111-hub/free-stack（公开仓库，GitHub Actions 公开仓库免费分钟不限）
+# 前置：在仓库 Settings → Secrets and variables → Actions → Variables 里新建 WORKER_URL，
+# 值为 https://free-stack-worker.ann307089.workers.dev
+name: free-stack daily health check
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # 每天 00:00 UTC
+  workflow_dispatch:     # 手动触发
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check Worker /health
+        env:
+          WORKER_URL: ${{ vars.WORKER_URL }}
+        run: |
+          set -e
+          if [ -z "$WORKER_URL" ]; then
+            echo "WORKER_URL 未配置：请在仓库 Variables 里设置" >&2
+            exit 1
+          fi
+          mkdir -p status
+          code=$(curl -s -o /tmp/health-body.json -w "%{http_code}" "$WORKER_URL/health")
+          echo "health HTTP: $code"
+          cat /tmp/health-body.json
+          CHECKED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ) HTTP_CODE=$code python3 - <<'EOF'
+          import json, os
+          body = json.load(open('/tmp/health-body.json'))
+          body['checked_at'] = os.environ['CHECKED_AT']
+          body['http_code'] = int(os.environ['HTTP_CODE'])
+          json.dump(body, open('status/health.json', 'w'), indent=2, ensure_ascii=False)
+          EOF
+          [ "$code" = "200" ]
+
+      - name: Commit status file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add status/health.json
+          git diff --cached --quiet || git commit -m "chore: daily health status"
+          git push
