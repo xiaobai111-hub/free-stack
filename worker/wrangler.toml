@@ -1,0 +1,8 @@
+name = "free-stack-worker"
+main = "src/index.js"
+compatibility_date = "2026-11-09"
+
+# Supabase 连接信息不要写在这里。部署后用下面任一方式配置：
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_ANON_KEY
+# 或在 Cloudflare Dashboard：Workers & Pages → free-stack-worker → Settings → Variables。
